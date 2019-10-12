@@ -130,7 +130,52 @@ func (o *OAuthQQ) GetOpenID(accessToken string) (string, error) {
 
 	return respData.OpenID, nil
 }
+//GetOpenIDUnionID return openid unionid by accesstoken
+func (o *OAuthQQ) GetOpenIDUnionID(accessToken string) (openid,unionid string,err error) {
+	// request
+	resp, err := grequests.Get(
+		`https://graph.qq.com/oauth2.0/me`,
+		&grequests.RequestOptions{
+			Params: map[string]string{
+				"access_token": accessToken,
+				"unionid": "1",
+			},
+		},
+	)
 
+	// request faild
+	if err != nil {
+		log.Println(err)
+		return openid,"", err
+	}
+
+	// jsonp to json
+	respJSON := regexp.MustCompile(`callback\((.*)\)(;)?`).ReplaceAllString(resp.String(), "$1")
+	// responseJson
+	respData := struct {
+		// error
+		Error            int    `json:"error,omitempty"`
+		ErrorDescription string `json:"error_description,omitempty"`
+		// success
+		UnionID string `json:"unionid"`
+		ClientID string `json:"client_id"`
+		OpenID   string `json:"openid"`
+	}{}
+
+	// request faild
+	if err := json.Unmarshal([]byte(respJSON), &respData); err != nil {
+		log.Println(err)
+		return openid,"", err
+	}
+
+	// error
+	if respData.Error > 0 {
+		log.Println(err)
+		return openid,"", errors.New(respData.ErrorDescription)
+	}
+
+	return respData.OpenID,respData.UnionID, nil
+}
 // Userinfo for qq by access token
 func (o *OAuthQQ) Userinfo(accessToken, openID string) (OAuthUserinfo, error) {
 	// return data
